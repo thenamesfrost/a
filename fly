@@ -12,7 +12,23 @@ local function setupFlight()
     local ctrl = {f = 0, b = 0, l = 0, r = 0}    
     local lastctrl = {f = 0, b = 0, l = 0, r = 0}    
     local maxspeed = 50    
-    local speed = 0    
+    local speed = 0
+-- Detect "Speed X" command in the console and update maxspeed
+local function detectSpeedCommand()
+    local logService = game:GetService("LogService")
+    
+    logService.MessageOut:Connect(function(message, messageType)
+        if messageType == Enum.MessageType.MessageOutput then
+            local speedValue = message:match("^Speed (%d+)$")  -- Capture only numbers after "Speed "
+            if speedValue then
+                maxspeed = tonumber(speedValue) -- Convert to number and update maxspeed
+                print("Max speed set to:", maxspeed)
+            end
+        end
+    end)
+end
+
+detectSpeedCommand()    
     
     -- Define the new idle flying animation    
     local flyingAnim = Instance.new("Animation")    
