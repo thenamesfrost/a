@@ -1,0 +1,268 @@
+local player = game.Players.LocalPlayer    
+    
+local function setupFlight()    
+    local character = player.Character or player.CharacterAdded:Wait()    
+    local humanoid = character:WaitForChild("Humanoid")    
+    
+    repeat wait() until player and character and character:FindFirstChild("Torso") and character:FindFirstChild("Humanoid")    
+    local mouse = player:GetMouse()    
+    repeat wait() until mouse    
+    local torso = character.Torso    
+    local flying = false    
+    local ctrl = {f = 0, b = 0, l = 0, r = 0}    
+    local lastctrl = {f = 0, b = 0, l = 0, r = 0}    
+    local maxspeed = 50    
+    local speed = 0
+-- Detect "Speed X" command in the console and update maxspeed
+local function detectSpeedCommand()
+    local logService = game:GetService("LogService")
+    
+    logService.MessageOut:Connect(function(message, messageType)
+        if messageType == Enum.MessageType.MessageOutput then
+            local speedValue = message:match("^Speed (%d+)$")  -- Capture only numbers after "Speed "
+            if speedValue then
+                maxspeed = tonumber(speedValue) -- Convert to number and update maxspeed
+                print("Max speed set to:", maxspeed)
+            end
+        end
+    end)
+end
+
+detectSpeedCommand()    
+    
+    -- Define the new idle flying animation    
+    local flyingAnim = Instance.new("Animation")    
+    flyingAnim.AnimationId = "rbxassetid://17124061663"    
+    local flyingTrack = humanoid:LoadAnimation(flyingAnim)    
+    
+    function Fly()    
+        local bg = Instance.new("BodyGyro", torso)    
+        bg.P = 9e4    
+        bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)    
+        bg.cframe = torso.CFrame    
+        local bv = Instance.new("BodyVelocity", torso)    
+        bv.velocity = Vector3.new(0, 0.1, 0)    
+        bv.maxForce = Vector3.new(9e9, 9e9, 9e9)    
+    
+        -- Disable other animations to prevent interference    
+        local animator = humanoid:FindFirstChildOfClass("Animator")    
+        if animator then    
+            for _, track in pairs(animator:GetPlayingAnimationTracks()) do    
+                track:Stop()    
+            end    
+        end    
+    
+        -- Ensure the animation keeps playing    
+        flyingTrack.Looped = true    
+        flyingTrack.Priority = Enum.AnimationPriority.Action4 -- Highest priority    
+        flyingTrack:Play()    
+        flyingTrack:AdjustSpeed(1) -- Maintain normal speed    
+    
+        -- Continuously reapply if it's stopped for any reason    
+        task.spawn(function()    
+            while flying do    
+                if not flyingTrack.IsPlaying then    
+                    flyingTrack:Play()    
+                end    
+                task.wait(0.1)    
+            end    
+        end)    
+    
+        repeat wait()    
+            character.Humanoid.PlatformStand = true    
+            if ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0 then    
+                speed = speed + 2 + (speed / maxspeed)    
+                if speed > maxspeed then    
+                    speed = maxspeed    
+                end    
+            elseif not (ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0) and speed ~= 0 then    
+                speed = speed - 1    
+                if speed < 0 then    
+                    speed = 0    
+                end    
+            end    
+            if (ctrl.l + ctrl.r) ~= 0 or (ctrl.f + ctrl.b) ~= 0 then    
+                bv.velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector * (ctrl.f + ctrl.b)) +     
+                ((game.Workspace.CurrentCamera.CoordinateFrame * CFrame.new(ctrl.l + ctrl.r, (ctrl.f + ctrl.b) * .2, 0).p) -     
+                game.Workspace.CurrentCamera.CoordinateFrame.p)) * speed    
+                lastctrl = {f = ctrl.f, b = ctrl.b, l = ctrl.l, r = ctrl.r}    
+            elseif (ctrl.l + ctrl.r) == 0 and (ctrl.f + ctrl.b) == 0 and speed ~= 0 then    
+                bv.velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector * (lastctrl.f + lastctrl.b)) +     
+                ((game.Workspace.CurrentCamera.CoordinateFrame * CFrame.new(lastctrl.l + lastctrl.r, (lastctrl.f + lastctrl.b) * .2, 0).p) -     
+                game.Workspace.CurrentCamera.CoordinateFrame.p)) * speed    
+            else    
+                bv.velocity = Vector3.new(0, 0.1, 0)    
+            end    
+    
+            -- Instant max tilt    
+            local maxTiltAngle = math.rad(25)    
+            local tilt = (ctrl.f + ctrl.b) * maxTiltAngle    
+            bg.cframe = game.Workspace.CurrentCamera.CoordinateFrame * CFrame.Angles(-tilt, 0, 0)    
+    
+        until not flying    
+        ctrl = {f = 0, b = 0, l = 0, r = 0}    
+        lastctrl = {f = 0, b = 0, l = 0, r = 0}    
+        speed = 0    
+        bg:Destroy()    
+        bv:Destroy()    
+        character.Humanoid.PlatformStand = false    
+    
+        -- Stop the flying animation when landing    
+        flyingTrack:Stop()    
+    end    
+    
+    mouse.KeyDown:connect(function(key)    
+        if key == "=" then    
+            if flying then     
+                flying = false    
+                    
+                -- Play exit animation before stopping flight    
+                local humanoid = character:FindFirstChildOfClass("Humanoid")    
+    
+                if humanoid then    
+                    local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)    
+                    local animation = Instance.new("Animation")    
+                    animation.AnimationId = "rbxassetid://184574340"    
+    
+                    local animationTrack = animator:LoadAnimation(animation)    
+                    animationTrack.Looped = false    
+                    animationTrack:Play()    
+                    animationTrack.TimePosition = 0.7    
+    
+                    wait(animationTrack.Length - 0.7)    
+                end    
+    
+                flyingTrack:Stop() -- Ensure the idle flying animation stops immediately    
+            else    
+                flying = true    
+                    
+                -- Pre-flight animation    
+                local rootPart = character:WaitForChild("HumanoidRootPart")    
+                local animationId = "184574340"    
+                local animation = Instance.new("Animation")    
+                animation.AnimationId = "rbxassetid://" .. animationId    
+    
+                local animTrack = humanoid:LoadAnimation(animation)    
+    
+                -- Play the animation in reverse    
+                animTrack.Looped = true    
+                animTrack:Play()    
+                animTrack:AdjustSpeed(-1) -- Play backwards    
+    
+                -- Launch the player high into the air and make them jump at 1.2 seconds    
+                task.delay(1, function()    
+                    if humanoid then    
+                        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)    
+                    end    
+                        
+                    if rootPart then    
+                        rootPart.Velocity = Vector3.new(0, 130, 0) -- Adjust Y for height    
+                    end    
+                end)    
+    
+                -- Stop the animation at 1.3 seconds    
+                task.delay(1.3, function()    
+                    if animTrack.IsPlaying then    
+                        animTrack:Stop()    
+                    end    
+    
+                    -- Start flying after 1.3 seconds    
+                    Fly()    
+                end)    
+            end    
+        elseif key == "w" then    
+            ctrl.f = 1    
+        elseif key == "s" then    
+            ctrl.b = -1    
+        elseif key == "a" then    
+            ctrl.l = -1    
+        elseif key == "d" then    
+            ctrl.r = 1    
+        end    
+    end)    
+    
+    mouse.KeyUp:connect(function(key)    
+        if key == "w" then    
+            ctrl.f = 0    
+        elseif key == "s" then    
+            ctrl.b = 0    
+        elseif key == "a" then    
+            ctrl.l = 0    
+        elseif key == "d" then    
+            ctrl.r = 0    
+        end    
+    end)    
+end    
+    
+-- Setup flight initially    
+setupFlight()    
+    
+-- Re-run the script on respawn    
+player.CharacterAdded:Connect(function()    
+    wait(0) -- Short delay to allow character to fully load    
+    setupFlight()    
+end)    
+    
+-- Wait for the player and character to load        
+repeat wait() until game.Players.LocalPlayer and game.Players.LocalPlayer.Character
+
+-- Wait for the player and character to load    
+repeat wait() until game.Players.LocalPlayer and game.Players.LocalPlayer.Character    
+
+local player = game.Players.LocalPlayer    
+local character = player.Character    
+
+-- Ensure character has a Head    
+local head = character:FindFirstChild("Head")    
+if not head then return end    
+
+-- Create BillboardGui    
+local billboardGui = Instance.new("BillboardGui")    
+billboardGui.Parent = head    
+billboardGui.Adornee = head    
+billboardGui.Size = UDim2.new(12, 0, 5, 0)    
+billboardGui.StudsOffset = Vector3.new(0, 4, 0)    
+billboardGui.AlwaysOnTop = true    
+
+-- Create Main Text Label    
+local textLabel = Instance.new("TextLabel")    
+textLabel.Parent = billboardGui    
+textLabel.Size = UDim2.new(1, 0, 0.5, 0)    
+textLabel.Position = UDim2.new(0, 0, 0.3, 0)    
+textLabel.BackgroundTransparency = 1    
+textLabel.Font = Enum.Font.Arcade    
+textLabel.TextSize = 100    
+textLabel.TextStrokeTransparency = 0    
+textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)    
+textLabel.TextScaled = true    
+textLabel.TextTransparency = 1 -- Start Fully Transparent    
+
+-- Set text with "Enabled" in green    
+textLabel.RichText = true    
+textLabel.Text = '<font color="rgb(255,255,255)">Make Sure Shiftlock Is Turned</font> <font color="rgb(255,0,0)">Off.</font>'  
+
+-- **Fast Fade-in**    
+spawn(function()    
+    for i = 1, 10 do    
+        textLabel.TextTransparency = 1 - (i * 0.1)    
+        wait(0.025)    
+    end    
+end)    
+
+-- **Brighter Flickering Effect**    
+spawn(function()    
+    while billboardGui.Parent do    
+        textLabel.TextTransparency = 0 + (math.random() * 0.05)    
+        wait(0.05)    
+    end    
+end)    
+
+-- **Faster Fade-out Effect**    
+wait(4.5)    
+spawn(function()    
+    for i = 1, 10 do    
+        textLabel.TextTransparency = i * 0.1    
+        wait(0.025)    
+    end    
+    billboardGui:Destroy()    
+end)
