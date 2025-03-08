@@ -1,0 +1,129 @@
+local G2L = {}  
+local uiExists = true  -- Prevent re-creation after destruction
+
+G2L["1"] = Instance.new("ScreenGui", gethui())
+G2L["1"]["Name"] = [[MinimalKeyboard]]
+G2L["1"]["ZIndexBehavior"] = Enum.ZIndexBehavior.Sibling
+G2L["1"]["ResetOnSpawn"] = false  
+
+G2L["2"] = Instance.new("Frame", G2L["1"])
+G2L["2"]["BackgroundColor3"] = Color3.fromRGB(25, 25, 25)
+G2L["2"]["Size"] = UDim2.new(0, 120, 0, 90)
+G2L["2"]["Position"] = UDim2.new(0.5, -60, 0.8, -45)
+G2L["2"]["Name"] = [[Main]]
+G2L["2"]["Active"] = true 
+G2L["2"]["Draggable"] = true 
+G2L["2"]["BackgroundTransparency"] = 1  
+
+-- Fade-in transition
+task.spawn(function()
+    for i = 1, 10 do
+        G2L["2"]["BackgroundTransparency"] = 1 - (i * 0.1)
+        task.wait(0.05)
+    end
+end)
+
+local function createKey(name, text, pos)
+    local key = Instance.new("TextButton", G2L["2"])
+    key["Text"] = text
+    key["BackgroundColor3"] = Color3.fromRGB(50, 50, 50)
+    key["TextSize"] = 20
+    key["Font"] = Enum.Font.SourceSansBold
+    key["TextColor3"] = Color3.fromRGB(255, 255, 255)
+    key["Size"] = UDim2.new(0, 30, 0, 30)
+    key["Position"] = pos
+    key["Name"] = name
+    key["AutoButtonColor"] = false 
+    key["BackgroundTransparency"] = 1 
+
+    -- Key appear transition
+    task.spawn(function()
+        for i = 1, 10 do
+            key["BackgroundTransparency"] = 1 - (i * 0.1)
+            task.wait(0.05)
+        end
+    end)
+
+    return key
+end
+
+-- Creating WASD keys, "FLY" key, and "LOCK" key
+local keys = {
+    W = createKey("W", "W", UDim2.new(0.5, -15, 0, 0)),
+    A = createKey("A", "A", UDim2.new(0, 0, 0, 35)),
+    S = createKey("S", "S", UDim2.new(0.5, -15, 0, 35)),
+    D = createKey("D", "D", UDim2.new(1, -30, 0, 35)),
+    Fly = createKey("Fly", "FLY", UDim2.new(0, 0, 1, -30)), 
+    Lock = createKey("Lock", "LOCK", UDim2.new(1, -30, 1, -30)) 
+}
+
+-- Close button (X)
+local closeButton = Instance.new("TextButton", G2L["2"])
+closeButton.Text = "X"
+closeButton.Size = UDim2.new(0, 20, 0, 20)
+closeButton.Position = UDim2.new(1, -25, 0, -5)
+closeButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeButton.Font = Enum.Font.SourceSansBold
+closeButton.TextSize = 16
+closeButton.AutoButtonColor = false
+
+-- Destroy UI permanently
+closeButton.MouseButton1Click:Connect(function()
+    uiExists = false  
+    G2L["1"]:Destroy()  
+end)
+
+-- Key press animation
+local function animateKeyPress(button)
+    task.spawn(function()
+        local originalSize = button.Size
+        local originalColor = button.BackgroundColor3
+        button:TweenSize(UDim2.new(0, 34, 0, 34), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.1, true)
+        button.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        task.wait(0.1)
+        button:TweenSize(originalSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.1, true)
+        button.BackgroundColor3 = originalColor
+    end)
+end
+
+-- Lock functionality toggle
+local isLocked = false
+keys.Lock.MouseButton1Click:Connect(function()
+    isLocked = not isLocked
+    G2L["2"].Draggable = not isLocked
+    if isLocked then
+        keys.Lock.Text = "UNLOCK"
+        keys.Lock.BackgroundColor3 = Color3.fromRGB(200, 0, 0) 
+    else
+        keys.Lock.Text = "LOCK"
+        keys.Lock.BackgroundColor3 = Color3.fromRGB(50, 50, 50) 
+    end
+end)
+
+-- Fly button toggle effect
+local flyActive = false
+keys.Fly.MouseButton1Click:Connect(function()
+    flyActive = not flyActive
+    if flyActive then
+        keys.Fly.BackgroundColor3 = Color3.fromRGB(200, 0, 0) 
+    else
+        keys.Fly.BackgroundColor3 = Color3.fromRGB(50, 50, 50) 
+    end
+    keypress(Enum.KeyCode.Equals)
+    task.wait(0.1)
+    keyrelease(Enum.KeyCode.Equals)
+end)
+
+-- Key functionality
+for key, button in pairs(keys) do
+    if key ~= "Lock" and key ~= "Fly" then
+        button.MouseButton1Down:Connect(function()
+            keypress(Enum.KeyCode[key])
+            animateKeyPress(button)
+        end)
+        button.MouseButton1Up:Connect(function()
+            keyrelease(Enum.KeyCode[key])
+        end)
+    end
+end
